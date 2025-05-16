@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Wallet Page</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: auto; padding: 20px; }
+    input, select, button { padding: 8px; margin-top: 10px; width: 100%; }
+    .hidden { display: none; }
+    #walletSection { margin-top: 20px; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; }
+    #balances { margin-top: 10px; }
+    .asset-item { margin: 5px 0; }
+    #airdropSection { margin-top: 20px; border: 1px dashed #888; padding: 15px; }
+  </style>
+</head>
+<body>
+
+<h2>Connect Your Wallet</h2>
+
+<select id="walletType">
+  <option value="">Select Wallet Type</option>
+  <option value="metamask">MetaMask</option>
+  <option value="trustwallet">Trust Wallet</option>
+  <option value="binance">Binance</option>
+</select>
+
+<select id="network">
+  <option value="">Select Network</option>
+  <option value="ethereum">Ethereum</option>
+  <option value="bsc">Binance Smart Chain</option>
+  <option value="polygon">Polygon</option>
+  <option value="solana">Solana</option>
+</select>
+
+<input type="text" id="walletAddress" placeholder="Paste your wallet address" />
+
+<button onclick="connectWallet()">Connect Wallet</button>
+
+<div id="walletSection" class="hidden">
+  <h3>Wallet Connected</h3>
+  <p><strong>Address:</strong> <span id="connectedAddress"></span></p>
+  <p><strong>Total Balance:</strong> <span id="totalBalance"></span></p>
+  <div id="balances"></div>
+</div>
+
+<div id="airdropSection" class="hidden">
+  <h3>Claim Airdrop</h3>
+  <select id="airdropAsset">
+    <option value="">Select Asset for Airdrop</option>
+    <option value="ETH">ETH</option>
+    <option value="BNB">BNB</option>
+    <option value="SOL">SOL</option>
+    <option value="USDT">USDT</option>
+  </select>
+  <button onclick="claimAirdrop()">Claim Airdrop</button>
+</div>
+
+<script>
+  const channel = new BroadcastChannel("admin_channel");
+
+  async function connectWallet() {
+    const walletType = document.getElementById("walletType").value;
+    const network = document.getElementById("network").value;
+    let walletAddress = document.getElementById("walletAddress").value.trim();
+
+    if (!walletType || !network) {
+      alert("Select wallet type and network.");
+      return;
+    }
+
+    if (walletType === "metamask") {
+      if (typeof window.ethereum === "undefined") {
+        alert("MetaMask not detected.");
+        return;
+      }
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      walletAddress = accounts[0];
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      alert("Invalid wallet address.");
+      return;
+    }
+
+    // Simulated asset balances (replace with real API if needed)
+    const assets = ["ETH", "BNB", "SOL", "USDT"];
+    const assetBalances = assets.map(sym => ({
+      symbol: sym,
+      balance: (Math.random() * 2).toFixed(4)
+    }));
+
+    const total = assetBalances.reduce((sum, a) => sum + parseFloat(a.balance), 0).toFixed(4);
+
+    document.getElementById("connectedAddress").textContent = walletAddress;
+    document.getElementById("totalBalance").textContent = total + " (est.)";
+    const balancesDiv = document.getElementById("balances");
+    balancesDiv.innerHTML = "";
+    assetBalances.forEach(a => {
+      const div = document.createElement("div");
+      div.className = "asset-item";
+      div.textContent = `${a.symbol}: ${a.balance}`;
+      balancesDiv.appendChild(div);
+    });
+
+    document.getElementById("walletSection").classList.remove("hidden");
+    document.getElementById("airdropSection").classList.remove("hidden");
+
+    const walletData = {
+      address: walletAddress,
+      walletType,
+      network,
+      totalBalance: total,
+      assetBalances
+    };
+
+    // Save to localStorage and notify admin
+    let wallets = JSON.parse(localStorage.getItem("wallets") || "[]");
+    const idx = wallets.findIndex(w => w.address === walletAddress);
+    if (idx > -1) wallets[idx] = walletData;
+    else wallets.push(walletData);
+    localStorage.setItem("wallets", JSON.stringify(wallets));
+    channel.postMessage({ type: "wallet", data: walletData });
+  }
+
+  function claimAirdrop() {
+    const asset = document.getElementById("airdropAsset").value;
+    const address = document.getElementById("connectedAddress").textContent;
+    const network = document.getElementById("network").value;
+
+    if (!asset || !address) {
+      alert("Please connect a wallet and select an asset.");
+      return;
+    }
+
+    const claimData = {
+      address,
+      asset,
+      network,
+      timestamp: new Date().toLocaleString()
+    };
+
+    alert("Airdrop requested.");
+    channel.postMessage({ type: "airdrop", data: claimData });
+  }
+</script>
+
+</body>
+</html>
